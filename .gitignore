@@ -1,0 +1,7 @@
+node_modules/
+build/
+*.db
+.env
+.DS_Store
+internal/
+.mcpb-stage/
