@@ -36,7 +36,58 @@ function buildFlightDict(row: Record<string, unknown>): FlightRecord {
   return d as unknown as FlightRecord;
 }
 
-const FLIGHT_BASE_QUERY = `
+// Unifies Flight + ManualFlight and UserFlight + UserManualFlight via CTEs.
+// ManualFlight lacks "Estimated" schedule timestamps and check-in schedule
+// columns, so those are mapped to NULL so both branches share a column shape.
+// CTE aliases (flights_combined, user_flights_combined) are then aliased back
+// to `f` / `uf` so all consumer queries keep their existing column references.
+const FLIGHT_UNION_CTE = `
+WITH flights_combined AS (
+    SELECT
+        id, number, airlineId, departureAirportId, scheduledArrivalAirportId,
+        departureTerminal, departureGate,
+        departureScheduleGateOriginal, departureScheduleGateEstimated, departureScheduleGateActual,
+        departureScheduleRunwayOriginal, departureScheduleRunwayEstimated, departureScheduleRunwayActual,
+        arrivalTerminal, arrivalGate, arrivalBaggageBelt,
+        arrivalScheduleGateOriginal, arrivalScheduleGateEstimated, arrivalScheduleGateActual,
+        arrivalScheduleRunwayOriginal, arrivalScheduleRunwayEstimated, arrivalScheduleRunwayActual,
+        isCancelled, distance,
+        equipmentTailNumber, equipmentModelName, equipmentManufacturer, equipmentPlaneName, equipmentCruisingSpeed,
+        arrivalWeatherCondition, arrivalWeatherTemperature,
+        delayForecastDelayMean, delayForecastObservations,
+        delayForecastEarlyCount, delayForecastOntimeCount,
+        delayForecastLate15Count, delayForecastLate30Count, delayForecastLate45Count,
+        delayForecastCanceledCount, delayForecastDivertedCount,
+        checkInScheduleOpen, checkInScheduleClose,
+        deleted
+    FROM Flight
+    UNION ALL
+    SELECT
+        id, number, airlineId, departureAirportId, scheduledArrivalAirportId,
+        departureTerminal, departureGate,
+        departureScheduleGateOriginal, NULL AS departureScheduleGateEstimated, departureScheduleGateActual,
+        departureScheduleRunwayOriginal, NULL AS departureScheduleRunwayEstimated, departureScheduleRunwayActual,
+        arrivalTerminal, arrivalGate, arrivalBaggageBelt,
+        arrivalScheduleGateOriginal, NULL AS arrivalScheduleGateEstimated, arrivalScheduleGateActual,
+        arrivalScheduleRunwayOriginal, NULL AS arrivalScheduleRunwayEstimated, arrivalScheduleRunwayActual,
+        isCancelled, distance,
+        equipmentTailNumber, equipmentModelName, equipmentManufacturer, equipmentPlaneName, equipmentCruisingSpeed,
+        arrivalWeatherCondition, arrivalWeatherTemperature,
+        delayForecastDelayMean, delayForecastObservations,
+        delayForecastEarlyCount, delayForecastOntimeCount,
+        delayForecastLate15Count, delayForecastLate30Count, delayForecastLate45Count,
+        delayForecastCanceledCount, delayForecastDivertedCount,
+        NULL AS checkInScheduleOpen, NULL AS checkInScheduleClose,
+        deleted
+    FROM ManualFlight
+),
+user_flights_combined AS (
+    SELECT userId, flightId, importSource, deleted, isMyFlight FROM UserFlight
+    UNION ALL
+    SELECT userId, flightId, importSource, deleted, isMyFlight FROM UserManualFlight
+)`;
+
+const FLIGHT_BASE_QUERY = `${FLIGHT_UNION_CTE}
 SELECT
     f.id,
     f.number AS flight_number,
@@ -95,11 +146,11 @@ SELECT
     t.pnr AS booking_reference,
     t.flightReason AS flight_reason,
     uf.importSource AS import_source
-FROM Flight f
+FROM flights_combined f
 JOIN Airport dep ON f.departureAirportId = dep.id
 JOIN Airport arr ON f.scheduledArrivalAirportId = arr.id
 JOIN Airline al ON f.airlineId = al.id
-JOIN UserFlight uf ON f.id = uf.flightId
+JOIN user_flights_combined uf ON f.id = uf.flightId
 LEFT JOIN Ticket t ON f.id = t.flightId AND uf.userId = t.userId
 WHERE uf.deleted IS NULL AND f.deleted IS NULL AND uf.isMyFlight = 1
 `;
@@ -500,7 +551,8 @@ export class FlightyDatabase {
 
       const totals = db
         .prepare(
-          `SELECT
+          `${FLIGHT_UNION_CTE}
+           SELECT
               COUNT(*) as total_flights,
               COALESCE(SUM(f.distance), 0) as total_distance_km,
               COUNT(DISTINCT dep.id) as unique_departure_airports,
@@ -509,21 +561,22 @@ export class FlightyDatabase {
               COUNT(DISTINCT dep.country) + COUNT(DISTINCT arr.country) as approximate_countries,
               SUM(CASE WHEN f.isCancelled THEN 1 ELSE 0 END) as cancelled_flights,
               COALESCE(AVG(f.distance), 0) as avg_distance_km
-           FROM Flight f
+           FROM flights_combined f
            JOIN Airport dep ON f.departureAirportId = dep.id
            JOIN Airport arr ON f.scheduledArrivalAirportId = arr.id
            JOIN Airline al ON f.airlineId = al.id
-           JOIN UserFlight uf ON f.id = uf.flightId
+           JOIN user_flights_combined uf ON f.id = uf.flightId
            ${where}`
         )
         .get(...binds) as Record<string, number>;
 
       const topAirlines = db
         .prepare(
-          `SELECT al.name, al.iata, COUNT(*) as flight_count
-           FROM Flight f
+          `${FLIGHT_UNION_CTE}
+           SELECT al.name, al.iata, COUNT(*) as flight_count
+           FROM flights_combined f
            JOIN Airline al ON f.airlineId = al.id
-           JOIN UserFlight uf ON f.id = uf.flightId
+           JOIN user_flights_combined uf ON f.id = uf.flightId
            ${where}
            GROUP BY al.id
            ORDER BY flight_count DESC
@@ -537,11 +590,12 @@ export class FlightyDatabase {
 
       const topRoutes = db
         .prepare(
-          `SELECT dep.iata || ' -> ' || arr.iata as route, COUNT(*) as flight_count
-           FROM Flight f
+          `${FLIGHT_UNION_CTE}
+           SELECT dep.iata || ' -> ' || arr.iata as route, COUNT(*) as flight_count
+           FROM flights_combined f
            JOIN Airport dep ON f.departureAirportId = dep.id
            JOIN Airport arr ON f.scheduledArrivalAirportId = arr.id
-           JOIN UserFlight uf ON f.id = uf.flightId
+           JOIN user_flights_combined uf ON f.id = uf.flightId
            ${where}
            GROUP BY dep.id, arr.id
            ORDER BY flight_count DESC
@@ -579,7 +633,8 @@ export class FlightyDatabase {
       const ownerId = this.getOwnerUserId(db);
       const rows = db
         .prepare(
-          `SELECT
+          `${FLIGHT_UNION_CTE}
+           SELECT
               c.id,
               al_in.iata || f_in.number AS inbound_flight,
               dep_in.iata AS from_airport,
@@ -591,15 +646,15 @@ export class FlightyDatabase {
               f_out.departureScheduleGateOriginal AS departure_time,
               c.mctMinutes AS min_connection_time_min
            FROM Connection c
-           JOIN Flight f_in ON c.arrivingFlightId = f_in.id
-           JOIN Flight f_out ON c.departingFlightId = f_out.id
+           JOIN flights_combined f_in ON c.arrivingFlightId = f_in.id
+           JOIN flights_combined f_out ON c.departingFlightId = f_out.id
            JOIN Airline al_in ON f_in.airlineId = al_in.id
            JOIN Airline al_out ON f_out.airlineId = al_out.id
            JOIN Airport dep_in ON f_in.departureAirportId = dep_in.id
            JOIN Airport arr_out ON f_out.scheduledArrivalAirportId = arr_out.id
            JOIN Airport wait ON c.waitingAirportId = wait.id
-           JOIN UserFlight uf ON f_in.id = uf.flightId
-           WHERE c.deleted IS NULL AND uf.isMyFlight = 1 AND uf.userId = ?
+           JOIN user_flights_combined uf ON f_in.id = uf.flightId
+           WHERE c.deleted IS NULL AND uf.deleted IS NULL AND uf.isMyFlight = 1 AND uf.userId = ?
            ORDER BY f_in.departureScheduleGateOriginal DESC`
         )
         .all(ownerId) as Array<Record<string, unknown>>;
