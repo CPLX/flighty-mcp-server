@@ -101,7 +101,7 @@ JOIN Airport arr ON f.scheduledArrivalAirportId = arr.id
 JOIN Airline al ON f.airlineId = al.id
 JOIN UserFlight uf ON f.id = uf.flightId
 LEFT JOIN Ticket t ON f.id = t.flightId AND uf.userId = t.userId
-WHERE uf.deleted IS NULL AND f.deleted IS NULL
+WHERE uf.deleted IS NULL AND f.deleted IS NULL AND uf.isMyFlight = 1
 `;
 
 export class FlightyDatabase {

@@ -1,7 +1,7 @@
 {
   "manifest_version": "0.2",
   "name": "flighty-mcp-server",
-  "version": "1.3.0",
+  "version": "1.4.0",
   "description": "Connect Claude to the Flighty flight tracking app. View flights, check statuses, get delay forecasts, see travel stats, and add or remove flights — all synced to your devices.",
   "author": {
     "name": "CPLX"
