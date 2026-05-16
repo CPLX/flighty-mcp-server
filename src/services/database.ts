@@ -76,7 +76,7 @@ SELECT
     f.equipmentManufacturer AS aircraft_manufacturer,
     f.equipmentPlaneName AS aircraft_name,
     f.equipmentCruisingSpeed AS cruising_speed_kmh,
-    f.arrivalWeatherCondition AS arrival_weather,
+    f.arrivalWeatherConditionName AS arrival_weather,
     f.arrivalWeatherTemperature AS arrival_temp_c,
     f.delayForecastDelayMean AS delay_forecast_mean_min,
     f.delayForecastObservations AS delay_forecast_observations,
