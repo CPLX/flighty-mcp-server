@@ -2,7 +2,6 @@ import Database from "better-sqlite3";
 import { existsSync } from "fs";
 import {
   MAIN_DB_PATH,
-  AUTH_DB_PATH,
   TIMESTAMP_COLUMNS,
   KM_TO_MILES,
   EARTH_CIRCUMFERENCE_KM,
@@ -121,36 +120,28 @@ export class FlightyDatabase {
     return new Database(this.dbPath, { readonly: true, fileMustExist: true });
   }
 
-  private getOwnerUserId(_db: Database.Database): string {
+  private getOwnerUserId(db: Database.Database): string {
     if (this.cachedOwnerId) return this.cachedOwnerId;
 
-    // Read the owner's userId from the JWT in Flighty's auth database.
-    // The JWT 'sub' claim matches the userId in the flight database.
-    try {
-      const authDb = new Database(AUTH_DB_PATH, { readonly: true, fileMustExist: true });
-      try {
-        const row = authDb
-          .prepare("SELECT ZTOKEN FROM ZUSER LIMIT 1")
-          .get() as { ZTOKEN: string } | undefined;
-        if (row?.ZTOKEN) {
-          const payload = row.ZTOKEN.split(".")[1];
-          const decoded = JSON.parse(
-            Buffer.from(payload, "base64url").toString("utf-8")
-          );
-          if (decoded.sub) {
-            this.cachedOwnerId = decoded.sub;
-            return decoded.sub;
-          }
-        }
-      } finally {
-        authDb.close();
-      }
-    } catch {
-      // Fall through to frequency-based fallback
+    // FLIGHTY_OWNER_USER_ID lets the operator pin the owner userId explicitly.
+    // Useful for friend-share installs where the locally signed-in Flighty
+    // account does not own any flight records itself — all flights in the
+    // local DB belong to a Flighty Friend's userId. The previous JWT-based
+    // lookup returned the signed-in account's userId, which filters out
+    // every shared flight and returns zero rows.
+    const envOwner = process.env.FLIGHTY_OWNER_USER_ID;
+    if (envOwner) {
+      this.cachedOwnerId = envOwner;
+      return envOwner;
     }
 
-    // Fallback: owner is the userId with the most flights
-    const fallback = _db
+    // Otherwise pick the userId with the most non-deleted flights in
+    // UserFlight. For single-account installs this matches the JWT-derived
+    // userId (the signed-in account owns all of its own flights). For
+    // friend-share installs it picks the friend whose flights are actually
+    // synced into the local database. Same fallback that previously fired
+    // only on JWT parse failures; now it is the default path.
+    const fallback = db
       .prepare(
         "SELECT userId, COUNT(*) as cnt FROM UserFlight WHERE deleted IS NULL GROUP BY userId ORDER BY cnt DESC LIMIT 1"
       )
