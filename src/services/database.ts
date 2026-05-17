@@ -483,7 +483,7 @@ export class FlightyDatabase {
     try {
       const ownerId = this.getOwnerUserId(db);
       let where =
-        "WHERE uf.deleted IS NULL AND f.deleted IS NULL AND uf.userId = ?";
+        "WHERE uf.deleted IS NULL AND f.deleted IS NULL AND uf.isMyFlight = 1 AND uf.userId = ?";
       const binds: unknown[] = [ownerId];
 
       if (year) {
@@ -599,7 +599,7 @@ export class FlightyDatabase {
            JOIN Airport arr_out ON f_out.scheduledArrivalAirportId = arr_out.id
            JOIN Airport wait ON c.waitingAirportId = wait.id
            JOIN UserFlight uf ON f_in.id = uf.flightId
-           WHERE c.deleted IS NULL AND uf.userId = ?
+           WHERE c.deleted IS NULL AND uf.isMyFlight = 1 AND uf.userId = ?
            ORDER BY f_in.departureScheduleGateOriginal DESC`
         )
         .all(ownerId) as Array<Record<string, unknown>>;
