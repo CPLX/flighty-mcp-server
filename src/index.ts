@@ -12,7 +12,7 @@ import { registerStatsTools } from "./tools/stats.js";
 import { registerConnectionTools } from "./tools/connections.js";
 import { registerWriteTools } from "./tools/write.js";
 
-const VERSION = "1.5.0";
+const VERSION = "1.6.0";
 
 const server = new McpServer({
   name: "flighty-mcp-server",
