@@ -126,6 +126,8 @@ Lists your flights with smart sort order based on the filter:
 
 For flights currently in progress or recently landed, use `flighty_current_flights` instead.
 
+Includes both auto-detected commercial flights and manually-entered flights (private/charter operators not in Flighty's commercial database, or commercial flights the user added by hand). Same applies to `flighty_search_flights`, `flighty_get_flight`, `flighty_current_flights`, `flighty_get_flight_status`, `flighty_get_delay_forecast`, `flighty_get_flight_stats`, and `flighty_get_connections`.
+
 ---
 
 ### flighty_current_flights
@@ -211,7 +213,9 @@ Aggregate statistics across your flight history.
 **Parameters:**
 - `year` (integer, optional) — filter to a specific year; omit for all-time
 
-**Returns:** Total flights, distance (km and miles), earth circumnavigations, unique airports/airlines/countries, cancelled flight count, top 5 airlines, top 5 routes.
+**Returns:** Total flights, distance (km and miles), earth circumnavigations, unique departure/arrival airports, unique airlines, `countries_visited` (deduped across departure and arrival countries), cancelled flight count, top 5 airlines, top 5 routes.
+
+Includes both auto-detected commercial flights and manually-entered flights (e.g., private/charter operators not in Flighty's commercial database).
 
 ---
 
@@ -274,7 +278,7 @@ Flighty stores all flight data in a local SQLite database on macOS at:
 ~/Library/Containers/com.flightyapp.flighty/Data/Documents/MainFlightyDatabase.db
 ```
 
-This server opens that database in read-only mode to answer queries. It reads all necessary credentials directly from the installed Flighty app:
+This server opens that database in read-only mode to answer queries. Queries `UNION` Flighty's `Flight` + `ManualFlight` and `UserFlight` + `UserManualFlight` tables so manually-entered flights surface alongside auto-detected commercial ones, and filter on `UserFlight.isMyFlight = 1` so flights the user is following from friends (`isMyFlight = 0`) don't leak into "your flights" queries. It reads all necessary credentials directly from the installed Flighty app:
 
 - **User identity** — JWT auth token from `Flighty.sqlite` (identifies the user to the API)
 - **API access** — build token from the app's `Info.plist` (identifies the app version)
