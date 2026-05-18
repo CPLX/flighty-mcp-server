@@ -1,6 +1,6 @@
 {
   "name": "flighty-mcp-server",
-  "version": "1.3.0",
+  "version": "1.5.0",
   "description": "MCP server for Flighty flight tracking — read local data and sync flights via Flighty API",
   "type": "module",
   "main": "build/index.js",
