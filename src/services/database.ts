@@ -558,7 +558,6 @@ export class FlightyDatabase {
               COUNT(DISTINCT dep.id) as unique_departure_airports,
               COUNT(DISTINCT arr.id) as unique_arrival_airports,
               COUNT(DISTINCT al.id) as unique_airlines,
-              COUNT(DISTINCT dep.country) + COUNT(DISTINCT arr.country) as approximate_countries,
               SUM(CASE WHEN f.isCancelled THEN 1 ELSE 0 END) as cancelled_flights,
               COALESCE(AVG(f.distance), 0) as avg_distance_km
            FROM flights_combined f
@@ -603,6 +602,28 @@ export class FlightyDatabase {
         )
         .all(...binds) as Array<{ route: string; flight_count: number }>;
 
+      // Countries visited = distinct set of departure and arrival countries.
+      // Previous implementation summed two COUNT(DISTINCT)s, double-counting
+      // any country that appeared as both origin and destination.
+      const countries = db
+        .prepare(
+          `${FLIGHT_UNION_CTE}
+           SELECT COUNT(*) AS countries_visited FROM (
+             SELECT dep.country AS country
+             FROM flights_combined f
+             JOIN Airport dep ON f.departureAirportId = dep.id
+             JOIN user_flights_combined uf ON f.id = uf.flightId
+             ${where}
+             UNION
+             SELECT arr.country AS country
+             FROM flights_combined f
+             JOIN Airport arr ON f.scheduledArrivalAirportId = arr.id
+             JOIN user_flights_combined uf ON f.id = uf.flightId
+             ${where}
+           ) WHERE country IS NOT NULL`
+        )
+        .get(...binds, ...binds) as { countries_visited: number };
+
       const distKm = totals.total_distance_km ?? 0;
       const avgKm = totals.avg_distance_km ?? 0;
 
@@ -617,7 +638,7 @@ export class FlightyDatabase {
         unique_departure_airports: totals.unique_departure_airports,
         unique_arrival_airports: totals.unique_arrival_airports,
         unique_airlines: totals.unique_airlines,
-        approximate_countries: totals.approximate_countries,
+        countries_visited: countries.countries_visited,
         cancelled_flights: totals.cancelled_flights,
         top_airlines: topAirlines,
         top_routes: topRoutes,

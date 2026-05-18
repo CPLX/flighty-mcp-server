@@ -147,7 +147,7 @@ export interface FlightStatsRecord {
   unique_departure_airports: number;
   unique_arrival_airports: number;
   unique_airlines: number;
-  approximate_countries: number;
+  countries_visited: number;
   cancelled_flights: number;
   top_airlines: Array<{ name: string; iata: string; flight_count: number }>;
   top_routes: Array<{ route: string; flight_count: number }>;
