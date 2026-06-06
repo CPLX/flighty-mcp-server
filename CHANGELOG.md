@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 The format is loosely based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.6.2] — 2026-06-06
+
+### Fixed
+
+- Every query built on `FLIGHT_BASE_QUERY` (`flighty_list_flights`, `flighty_list_friend_flights`, `flighty_current_flights`, `flighty_get_flight`, `flighty_search_flights`, `flighty_get_flight_status`, `flighty_get_delay_forecast`) failed to prepare with `no such column: arrivalWeatherCondition` against current Flighty installs. The column was renamed to `arrivalWeatherConditionName` in Flighty's local SQLite schema; the `Flight` / `ManualFlight` branches of the union CTE now select the renamed column under the existing alias so downstream code is unchanged.
+
 ## [1.6.1] — 2026-05-18
 
 ### Changed
@@ -47,6 +53,7 @@ Filter `isMyFlight = 1` so friend-followed flights stop leaking into own-flight 
 
 Initial public release.
 
+[1.6.2]: https://github.com/CPLX/flighty-mcp-server/releases/tag/v1.6.2
 [1.6.1]: https://github.com/CPLX/flighty-mcp-server/releases/tag/v1.6.1
 [1.6.0]: https://github.com/CPLX/flighty-mcp-server/releases/tag/v1.6.0
 [1.5.0]: https://github.com/CPLX/flighty-mcp-server/releases/tag/v1.5.0
