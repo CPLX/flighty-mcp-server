@@ -24,7 +24,7 @@ Read operations query Flighty's local SQLite database directly (fast, offline-ca
 - **macOS** — Flighty stores its database in the macOS app sandbox
 - **Flighty macOS app** — installed and signed in
 - **Flighty Pro** — required for the add/remove flight features
-- **Node.js 18+** (only for manual install; the .mcpb bundle includes its own runtime)
+- **Node.js 24+** (only for manual install; the .mcpb bundle includes its own runtime)
 
 ## Installation
 

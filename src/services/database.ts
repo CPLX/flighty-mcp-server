@@ -1,4 +1,4 @@
-import Database from "better-sqlite3";
+import { DatabaseSync as Database } from "node:sqlite";
 import { existsSync } from "fs";
 import {
   MAIN_DB_PATH,
@@ -163,22 +163,22 @@ export class FlightyDatabase {
     this.dbPath = dbPath;
   }
 
-  private getDb(): Database.Database {
+  private getDb(): Database {
     if (!existsSync(this.dbPath)) {
       throw new Error(
         `Flighty database not found at ${this.dbPath}. Make sure the Flighty app is installed.`
       );
     }
-    return new Database(this.dbPath, { readonly: true, fileMustExist: true });
+    return new Database(this.dbPath, { readOnly: true });
   }
 
-  private getOwnerUserId(_db: Database.Database): string {
+  private getOwnerUserId(_db: Database): string {
     if (this.cachedOwnerId) return this.cachedOwnerId;
 
     // Read the owner's userId from the JWT in Flighty's auth database.
     // The JWT 'sub' claim matches the userId in the flight database.
     try {
-      const authDb = new Database(AUTH_DB_PATH, { readonly: true, fileMustExist: true });
+      const authDb = new Database(AUTH_DB_PATH, { readOnly: true });
       try {
         const row = authDb
           .prepare("SELECT ZTOKEN FROM ZUSER LIMIT 1")
@@ -220,7 +220,7 @@ export class FlightyDatabase {
     try {
       const ownerId = this.getOwnerUserId(db);
       let query = FLIGHT_BASE_QUERY + " AND uf.userId = ?";
-      const binds: unknown[] = [ownerId];
+      const binds: (string | number | null)[] = [ownerId];
 
       const now = Math.floor(Date.now() / 1000);
       if (params.upcoming_only) {
@@ -278,7 +278,7 @@ export class FlightyDatabase {
       );
 
       query += " AND uf.userId != ?";
-      const binds: unknown[] = [ownerId];
+      const binds: (string | number | null)[] = [ownerId];
 
       if (params.friend_name) {
         query +=
@@ -315,7 +315,7 @@ export class FlightyDatabase {
     try {
       const ownerId = this.getOwnerUserId(db);
       let query = FLIGHT_BASE_QUERY + " AND uf.userId = ?";
-      let binds: unknown[] = [ownerId];
+      let binds: (string | number | null)[] = [ownerId];
 
       if (params.flight_id) {
         query += " AND f.id = ?";
@@ -349,7 +349,7 @@ export class FlightyDatabase {
     try {
       const ownerId = this.getOwnerUserId(db);
       let query = FLIGHT_BASE_QUERY + " AND uf.userId = ?";
-      const binds: unknown[] = [ownerId];
+      const binds: (string | number | null)[] = [ownerId];
 
       if (params.airline) {
         query +=
@@ -502,7 +502,7 @@ export class FlightyDatabase {
              relevance DESC
            LIMIT ?`
         )
-        .all(query, query, `%${query}%`, `%${query}%`, query, query, query, limit) as AirportRecord[];
+        .all(query, query, `%${query}%`, `%${query}%`, query, query, query, limit) as unknown as AirportRecord[];
     } finally {
       db.close();
     }
@@ -523,7 +523,7 @@ export class FlightyDatabase {
            ORDER BY relevance DESC
            LIMIT ?`
         )
-        .all(query, query, `%${query}%`, `%${query}%`, limit) as AirlineRecord[];
+        .all(query, query, `%${query}%`, `%${query}%`, limit) as unknown as AirlineRecord[];
     } finally {
       db.close();
     }
@@ -535,7 +535,7 @@ export class FlightyDatabase {
       const ownerId = this.getOwnerUserId(db);
       let where =
         "WHERE uf.deleted IS NULL AND f.deleted IS NULL AND uf.isMyFlight = 1 AND uf.userId = ?";
-      const binds: unknown[] = [ownerId];
+      const binds: (string | number | null)[] = [ownerId];
 
       if (year) {
         const start = Math.floor(
