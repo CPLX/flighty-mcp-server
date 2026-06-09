@@ -101,6 +101,98 @@ Returns the server-side flight UUID on success.`,
   );
 
   server.registerTool(
+    "flighty_follow_flight",
+    {
+      title: "Follow Flight",
+      description: `Follow a flight without being a passenger — use this to track someone else's flight (e.g., a family member or friend). The flight is registered with Flighty's server and syncs to all devices within seconds. It will appear in flighty_list_friend_flights results (with friend_name as null, since no Flighty friend connection is involved).
+
+The airline is detected from the flight code prefix (e.g. "DL" from "DL10"). The Flighty API provides full enrichment: gate assignments, weather, equipment, delay forecast, codeshare partners.
+
+This tool calls the Flighty API — it requires the Flighty app to be installed and signed in.
+
+Returns the server-side flight UUID on success.`,
+      inputSchema: {
+        flight_code: z
+          .string()
+          .describe(
+            'Flight code, e.g. "DL10", "UA194", "BA930". The 2-character airline prefix is parsed automatically.'
+          ),
+        date: z
+          .string()
+          .describe(
+            'Departure date in YYYY-MM-DD format, e.g. "2026-04-15"'
+          ),
+      },
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: false,
+        idempotentHint: false,
+        openWorldHint: true,
+      },
+    },
+    async (params) => {
+      try {
+        const { airlineIata, flightNumber } = parseFlightCode(
+          params.flight_code
+        );
+
+        const airline = db.lookupAirline(airlineIata);
+
+        const serverUuid = await api.searchFlight(
+          airline.id,
+          flightNumber,
+          params.date
+        );
+
+        if (!serverUuid) {
+          return {
+            content: [
+              {
+                type: "text",
+                text: `No flight found for ${params.flight_code} on ${params.date}. Check the flight number and date.`,
+              },
+            ],
+            isError: true,
+          };
+        }
+
+        await api.followFlight(serverUuid);
+
+        return {
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify(
+                {
+                  status: "followed",
+                  flight_code: params.flight_code,
+                  date: params.date,
+                  airline: airline.name,
+                  server_flight_uuid: serverUuid,
+                  message:
+                    "Flight added to your Flighty tracking list. It will appear on all your devices within seconds.",
+                },
+                null,
+                2
+              ),
+            },
+          ],
+        };
+      } catch (err) {
+        return {
+          content: [
+            {
+              type: "text",
+              text: `Error following flight: ${err instanceof Error ? err.message : String(err)}`,
+            },
+          ],
+          isError: true,
+        };
+      }
+    }
+  );
+
+  server.registerTool(
     "flighty_remove_flight",
     {
       title: "Remove Flight",

@@ -13,6 +13,7 @@ This server gives any MCP-compatible AI assistant (Claude, etc.) full read/write
 - **"How often is AA179 delayed?"** — historical on-time performance with percentage breakdowns
 - **"Show my flight stats for 2025"** — total flights, miles, top airlines, top routes
 - **"Add DL10 on April 20"** — adds the flight to your Flighty account, syncs to all devices within seconds
+- **"Follow UA194 on December 25"** — track someone else's flight (e.g. to pick them up), syncs to all devices
 - **"Remove that flight"** — deletes it from your account across all devices
 - **"Are any friends flying soon?"** — checks connected friends' upcoming flights
 - **"What version of the Flighty tool is this?"** — server info, capabilities, and version
@@ -73,7 +74,7 @@ Restart the client after adding the config.
 
 ## Tools
 
-14 tools organized into four categories.
+15 tools organized into four categories.
 
 ### Flight Management
 
@@ -84,6 +85,7 @@ Restart the client after adding the config.
 | `flighty_get_flight` | Get details for a single flight by UUID or flight number (e.g., "AA179") |
 | `flighty_search_flights` | Search your flight history by airline, airports, or date range |
 | `flighty_add_flight` | Add a flight by code and date (e.g., "DL10" on "2026-04-20"). Syncs to all devices |
+| `flighty_follow_flight` | Follow a flight without being a passenger (e.g., tracking someone's flight). Syncs to all devices |
 | `flighty_remove_flight` | Remove a flight by UUID. Permanent deletion across all devices |
 
 ### Flight Intelligence
@@ -254,6 +256,18 @@ Adds a flight to your Flighty account via the Flighty API. The flight syncs to a
 
 ---
 
+### flighty_follow_flight
+
+Follows a flight without marking yourself as a passenger — use this to track someone else's flight (e.g., a family member's arrival). The flight is registered with Flighty's server and syncs to all devices. It will appear in `flighty_list_friend_flights` results (with `friend_name` as `null`).
+
+**Parameters:**
+- `flight_code` (string) — e.g., "UA194", "DL10". The airline prefix is parsed automatically
+- `date` (string) — departure date in YYYY-MM-DD format
+
+**Returns:** The server-side flight UUID on success, or an error if the flight isn't found for that date.
+
+---
+
 ### flighty_remove_flight
 
 Permanently removes a flight from your Flighty account across all devices.
@@ -278,7 +292,7 @@ Flighty stores all flight data in a local SQLite database on macOS at:
 ~/Library/Containers/com.flightyapp.flighty/Data/Documents/MainFlightyDatabase.db
 ```
 
-This server opens that database in read-only mode to answer queries. Queries `UNION` Flighty's `Flight` + `ManualFlight` and `UserFlight` + `UserManualFlight` tables so manually-entered flights surface alongside auto-detected commercial ones, and filter on `UserFlight.isMyFlight = 1` so flights the user is following from friends (`isMyFlight = 0`) don't leak into "your flights" queries. It reads all necessary credentials directly from the installed Flighty app:
+This server opens that database in read-only mode to answer queries. Queries `UNION` Flighty's `Flight` + `ManualFlight` and `UserFlight` + `UserManualFlight` tables so manually-entered flights surface alongside auto-detected commercial ones, and filter on `UserFlight.isMyFlight = 1` so followed/tracked flights (`isMyFlight = 0`) don't leak into "your flights" queries. Followed flights (`isMyFlight = 0`) are surfaced by `flighty_list_friend_flights` alongside connected friends' flights. It reads all necessary credentials directly from the installed Flighty app:
 
 - **User identity** — JWT auth token from `Flighty.sqlite` (identifies the user to the API)
 - **API access** — build token from the app's `Info.plist` (identifies the app version)

@@ -271,13 +271,19 @@ export class FlightyDatabase {
         "LEFT JOIN Ticket t ON f.id = t.flightId AND uf.userId = t.userId\nLEFT JOIN Profile p ON uf.userId = p.userId"
       );
 
-      // Add friend_name to SELECT
+      // Add friend_name to SELECT — null for owner's own tracked flights (isMyFlight=0)
       query = query.replace(
         "SELECT\n    f.id,",
-        "SELECT\n    p.fullName AS friend_name,\n    f.id,"
+        "SELECT\n    CASE WHEN uf.isMyFlight = 1 THEN p.fullName END AS friend_name,\n    f.id,"
       );
 
-      query += " AND uf.userId != ?";
+      // Include friend's passenger flights (isMyFlight=1, userId != owner) AND
+      // owner's tracked non-passenger flights (isMyFlight=0, userId = owner).
+      // Equivalent to: NOT (owner's own passenger flights).
+      query = query.replace(
+        "AND uf.isMyFlight = 1",
+        "AND (uf.userId != ? OR uf.isMyFlight = 0)"
+      );
       const binds: (string | number | null)[] = [ownerId];
 
       if (params.friend_name) {
