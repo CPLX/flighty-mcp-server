@@ -32,7 +32,7 @@ cp -r "$PROJECT_DIR/build/tools" "$STAGE_DIR/server/tools"
 cp "$PROJECT_DIR/package.json" "$STAGE_DIR/"
 cp "$PROJECT_DIR/package-lock.json" "$STAGE_DIR/"
 
-echo "Installing production dependencies (includes native better-sqlite3)..."
+echo "Installing production dependencies..."
 cd "$STAGE_DIR"
 npm ci --omit=dev 2>&1 | tail -3
 

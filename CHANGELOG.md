@@ -4,6 +4,14 @@ All notable changes to this project will be documented in this file.
 
 The format is loosely based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.6.2] — 2026-06-08
+
+### Changed
+
+- Replaced `better-sqlite3` (native addon) with Node.js's built-in `node:sqlite` module. This eliminates a macOS code-signature mismatch (`different Team IDs`) that prevented the extension from loading when installed via Claude Desktop's `.mcpb` bundle, because Claude Desktop's Electron runtime enforces that loaded native addons share its Team ID (`Q6L2SF6YDW`). The built-in `node:sqlite` module has no native addon and is therefore not subject to this check.
+- Removed `better-sqlite3` and `@types/better-sqlite3` from dependencies.
+- Updated minimum Node.js requirement from `>=18` to `>=24.0.0` (`node:sqlite` became stable and flag-free in Node.js 24).
+
 ## [1.6.1] — 2026-05-18
 
 ### Changed
@@ -47,6 +55,7 @@ Filter `isMyFlight = 1` so friend-followed flights stop leaking into own-flight 
 
 Initial public release.
 
+[1.6.2]: https://github.com/CPLX/flighty-mcp-server/releases/tag/v1.6.2
 [1.6.1]: https://github.com/CPLX/flighty-mcp-server/releases/tag/v1.6.1
 [1.6.0]: https://github.com/CPLX/flighty-mcp-server/releases/tag/v1.6.0
 [1.5.0]: https://github.com/CPLX/flighty-mcp-server/releases/tag/v1.5.0

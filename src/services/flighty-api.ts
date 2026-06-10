@@ -1,4 +1,4 @@
-import Database from "better-sqlite3";
+import { DatabaseSync as Database } from "node:sqlite";
 import { execSync } from "child_process";
 import {
   AUTH_DB_PATH,
@@ -47,10 +47,7 @@ export class FlightyApi {
   private getJwt(): string {
     if (this.jwt) return this.jwt;
 
-    const db = new Database(AUTH_DB_PATH, {
-      readonly: true,
-      fileMustExist: true,
-    });
+    const db = new Database(AUTH_DB_PATH, { readOnly: true });
     try {
       const row = db
         .prepare("SELECT ZTOKEN FROM ZUSER LIMIT 1")
