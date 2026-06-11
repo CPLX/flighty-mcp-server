@@ -279,12 +279,13 @@ export class FlightyDatabase {
 
       // Include friend's passenger flights (isMyFlight=1, userId != owner) AND
       // owner's tracked non-passenger flights (isMyFlight=0, userId = owner).
-      // Equivalent to: NOT (owner's own passenger flights).
+      // Both conditions are necessary: the looser (userId != ? OR isMyFlight = 0)
+      // would also admit a friend's own isMyFlight=0 rows, blanking their friend_name.
       query = query.replace(
         "AND uf.isMyFlight = 1",
-        "AND (uf.userId != ? OR uf.isMyFlight = 0)"
+        "AND ((uf.userId != ? AND uf.isMyFlight = 1) OR (uf.userId = ? AND uf.isMyFlight = 0))"
       );
-      const binds: (string | number | null)[] = [ownerId];
+      const binds: (string | number | null)[] = [ownerId, ownerId];
 
       if (params.friend_name) {
         query +=
