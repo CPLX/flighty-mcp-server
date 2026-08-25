@@ -1,6 +1,6 @@
 {
   "name": "flighty-mcp-server",
-  "version": "1.6.3",
+  "version": "1.7.1",
   "description": "MCP server for Flighty flight tracking — read local data and sync flights via Flighty API",
   "type": "module",
   "main": "build/index.js",
@@ -8,6 +8,7 @@
     "start": "node build/index.js",
     "dev": "tsx watch src/index.ts",
     "build": "tsc",
+    "test": "node --import tsx/esm --test src/__tests__/*.test.ts",
     "clean": "rm -rf build"
   },
   "engines": {

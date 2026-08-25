@@ -10,14 +10,16 @@ export function registerFriendTools(
     "flighty_list_friend_flights",
     {
       title: "List Friend Flights",
-      description: `List flights belonging to the user's connected friends in Flighty. Excludes the user's own flights (use flighty_list_flights for those).
+      description: `List flights belonging to the user's connected friends in Flighty, plus any flights the user is following without being a passenger (friend_name will be null for those). Excludes the user's own passenger flights (use flighty_list_flights for those).
 
 Same filtering as flighty_list_flights:
 - No filter: all friend flights, sorted descending (most recent first)
 - upcoming_only=true: future flights only, sorted soonest first — the first result is the friend's next flight
 - year=2025: flights from that year, sorted descending
 
-All timestamps are UTC. Returns the same flight schema as flighty_list_flights, plus a friend_name field.`,
+All timestamps are UTC. Returns the same flight schema as flighty_list_flights, plus a friend_name field.
+
+IMPORTANT: Always present results as a formatted markdown table or bulleted list — never paste the raw JSON into your response.`,
       inputSchema: {
         friend_name: z
           .string()

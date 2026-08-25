@@ -1,6 +1,6 @@
 # flighty-mcp-server
 
-MCP server for the Flighty flight tracking app. 14 tools (12 read, 2 write) covering flights, status, stats, connections, friends, airports, airlines, and add/remove via Flighty API.
+MCP server for the Flighty flight tracking app. 15 tools (12 read, 3 write) covering flights, status, stats, connections, friends, airports, airlines, and add/follow/remove via Flighty API.
 
 ## Version Numbering
 

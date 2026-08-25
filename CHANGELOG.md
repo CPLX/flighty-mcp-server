@@ -4,11 +4,26 @@ All notable changes to this project will be documented in this file.
 
 The format is loosely based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.7.1] — 2026-06-09
+
+### Changed
+
+- `flighty_list_friend_flights` tool description now instructs Claude to render results as a formatted markdown table or list rather than pasting raw JSON.
+
+## [1.7.0] — 2026-06-09
+
+### Added
+
+- `flighty_follow_flight` tool: follow a flight without being a passenger (e.g. to track a family member's flight). Calls `POST /v1/flight/{uuid}/subscribe?is_passenger=false`, which creates a `UserFlight` row with `isMyFlight=0` and syncs to all devices.
+- `flighty_list_friend_flights` now surfaces followed flights (the owner's `isMyFlight=0` rows) alongside connected friends' flights. Previously those rows were invisible to all read tools. The `friend_name` field is `null` for followed flights (there is no Flighty friend connection involved) and the friend's name for true social flights.
+- Test suite using Node.js built-in `node:test`. Run with `npm test`.
+
 ## [1.6.3] — 2026-06-10
 
 ### Fixed
 
 - Every query built on `FLIGHT_BASE_QUERY` (`flighty_list_flights`, `flighty_list_friend_flights`, `flighty_current_flights`, `flighty_get_flight`, `flighty_search_flights`, `flighty_get_flight_status`, `flighty_get_delay_forecast`) failed to prepare with `no such column: arrivalWeatherCondition` against current Flighty installs. Newer Flighty builds replace that column with `arrivalWeatherConditionName` (older builds carry both, with only the new one still populated); the `Flight` / `ManualFlight` branches of the union CTE now select the new column under the existing alias so downstream code is unchanged. As a side effect, `arrival_weather` values switch from enum-style strings (`mostlyCloudy`) to display names (`Mostly Cloudy`), and flights whose legacy column had gone stale get weather values back.
+
 
 ## [1.6.2] — 2026-06-08
 
@@ -61,6 +76,8 @@ Filter `isMyFlight = 1` so friend-followed flights stop leaking into own-flight 
 
 Initial public release.
 
+[1.7.1]: https://github.com/CPLX/flighty-mcp-server/releases/tag/v1.7.1
+[1.7.0]: https://github.com/CPLX/flighty-mcp-server/releases/tag/v1.7.0
 [1.6.3]: https://github.com/CPLX/flighty-mcp-server/releases/tag/v1.6.3
 [1.6.2]: https://github.com/CPLX/flighty-mcp-server/releases/tag/v1.6.2
 [1.6.1]: https://github.com/CPLX/flighty-mcp-server/releases/tag/v1.6.1

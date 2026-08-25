@@ -12,7 +12,7 @@ import { registerStatsTools } from "./tools/stats.js";
 import { registerConnectionTools } from "./tools/connections.js";
 import { registerWriteTools } from "./tools/write.js";
 
-const VERSION = "1.6.3";
+const VERSION = "1.7.1";
 
 const server = new McpServer({
   name: "flighty-mcp-server",
@@ -67,6 +67,7 @@ server.registerTool(
         ],
         write: [
           "flighty_add_flight — add a flight (syncs to all devices)",
+          "flighty_follow_flight — follow a flight without being a passenger (syncs to all devices)",
           "flighty_remove_flight — remove a flight (permanent, syncs to all devices)",
         ],
       },

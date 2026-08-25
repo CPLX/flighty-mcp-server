@@ -139,6 +139,27 @@ export class FlightyApi {
   }
 
   /**
+   * Follow a flight without being a passenger — adds it to the user's tracking list (isMyFlight=0).
+   */
+  async followFlight(serverFlightUuid: string): Promise<void> {
+    const resp = await fetch(
+      `${FLIGHTY_API_BASE}/v1/flight/${serverFlightUuid}/subscribe?is_passenger=false&source`,
+      {
+        method: "POST",
+        headers: {
+          ...this.getHeaders(),
+          "content-length": "0",
+        },
+      }
+    );
+
+    if (!resp.ok) {
+      const text = await resp.text();
+      throw new Error(`Flighty follow failed (${resp.status}): ${text}`);
+    }
+  }
+
+  /**
    * Delete a flight from the user's account via sync/full.
    */
   async deleteFlight(flightUuid: string): Promise<void> {
