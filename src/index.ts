@@ -12,7 +12,7 @@ import { registerStatsTools } from "./tools/stats.js";
 import { registerConnectionTools } from "./tools/connections.js";
 import { registerWriteTools } from "./tools/write.js";
 
-const VERSION = "1.8.0";
+const VERSION = "1.9.0";
 
 // Accept any truthy string ("1", "true", "yes") case-insensitively.
 // Empty string / unset / "0" / "false" / "no" all mean write tools stay enabled.
