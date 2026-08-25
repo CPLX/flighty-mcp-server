@@ -28,6 +28,7 @@ After bumping, always rebuild the .mcpb: `scripts/build-extension.sh`
 - **Owner ID comes from the JWT** in `Flighty.sqlite`, not from a heuristic. Fallback to frequency-based lookup if auth DB is unavailable.
 - **Build token read from Info.plist** at runtime — updates automatically when user updates Flighty.
 - **Write tools call Flighty's private API** — protobuf encoding, no library dependency.
+- **Read-only mode** — `FLIGHTY_READ_ONLY=1` (or `true` / `yes`) skips `registerWriteTools`, dropping the tool count from 15 to 12. `.mcpb` installs expose this as a Read-Only Mode checkbox via `manifest.json` `user_config.read_only` mapped to the env var.
 
 ## Git & GitHub
 

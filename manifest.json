@@ -1,10 +1,18 @@
 {
   "manifest_version": "0.2",
   "name": "flighty-mcp-server",
-  "version": "1.7.2",
+  "version": "1.8.0",
   "description": "Connect Claude to the Flighty flight tracking app. View flights, check statuses, get delay forecasts, see travel stats, and add or remove flights — all synced to your devices.",
   "author": {
     "name": "CPLX"
+  },
+  "user_config": {
+    "read_only": {
+      "type": "boolean",
+      "title": "Read-Only Mode",
+      "description": "Disable the add/follow/remove flight tools. Claude can still read your flight data but cannot modify your Flighty account. Recommended if you only want travel context in AI conversations.",
+      "default": false
+    }
   },
   "server": {
     "type": "node",
@@ -13,7 +21,10 @@
       "command": "node",
       "args": [
         "${__dirname}/server/index.js"
-      ]
+      ],
+      "env": {
+        "FLIGHTY_READ_ONLY": "${user_config.read_only}"
+      }
     }
   },
   "license": "MIT"
