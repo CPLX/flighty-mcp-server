@@ -72,9 +72,31 @@ Build from source as above, then add to `~/Library/Application Support/Claude/cl
 
 Restart the client after adding the config.
 
+## Read-Only Mode
+
+By default the server exposes 15 tools, including three that modify your Flighty account: `flighty_add_flight`, `flighty_follow_flight`, and `flighty_remove_flight`. If you only want Claude to read your flight data, you can disable the write tools so they don't appear in `tools/list` at all — the safest way to cap the blast radius.
+
+**Claude Desktop (`.mcpb`):** during install, check the **Read-Only Mode** box. You can toggle it later from the extension's settings.
+
+**Claude Code / manual install:** set the environment variable before launching the server. Add `env` to your MCP config:
+
+```json
+{
+  "mcpServers": {
+    "flighty": {
+      "command": "node",
+      "args": ["/absolute/path/to/flighty-mcp-server/build/index.js"],
+      "env": { "FLIGHTY_READ_ONLY": "1" }
+    }
+  }
+}
+```
+
+Accepted truthy values: `1`, `true`, `yes` (case-insensitive). Anything else (or unset) leaves write tools enabled. `flighty_about` reports the current mode.
+
 ## Tools
 
-15 tools organized into four categories.
+15 tools organized into four categories (12 read + 3 write; write tools are hidden when Read-Only Mode is on).
 
 ### Flight Management
 
