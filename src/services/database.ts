@@ -172,11 +172,25 @@ export class FlightyDatabase {
     return new Database(this.dbPath, { readOnly: true });
   }
 
-  private getOwnerUserId(_db: Database): string {
+  private getOwnerUserId(db: Database): string {
     if (this.cachedOwnerId) return this.cachedOwnerId;
 
-    // Read the owner's userId from the JWT in Flighty's auth database.
-    // The JWT 'sub' claim matches the userId in the flight database.
+    // Tier 0: FLIGHTY_OWNER_USER_ID env var — operator pin.
+    // Use case: a friend-share install with multiple owners' flights in the
+    // local DB where the operator wants to pin a specific one, or any install
+    // where the JWT-based lookup and frequency heuristic both pick the wrong
+    // user.
+    const envOwner = process.env.FLIGHTY_OWNER_USER_ID;
+    if (envOwner) {
+      this.cachedOwnerId = envOwner;
+      return envOwner;
+    }
+
+    // Tier 1: JWT `sub` claim from Flighty.sqlite. Authoritative for standard
+    // single-account installs. But on friend-share installs the locally
+    // signed-in account may own zero flights and the JWT userId won't match
+    // any UserFlight/UserManualFlight rows — in that case, fall through to
+    // Tier 2 rather than returning a userId that filters every query to zero.
     try {
       const authDb = new Database(AUTH_DB_PATH, { readOnly: true });
       try {
@@ -188,7 +202,7 @@ export class FlightyDatabase {
           const decoded = JSON.parse(
             Buffer.from(payload, "base64url").toString("utf-8")
           );
-          if (decoded.sub) {
+          if (decoded.sub && this.userHasAnyFlights(db, decoded.sub)) {
             this.cachedOwnerId = decoded.sub;
             return decoded.sub;
           }
@@ -200,19 +214,44 @@ export class FlightyDatabase {
       // Fall through to frequency-based fallback
     }
 
-    // Fallback: owner is the userId with the most flights
-    const fallback = _db
+    // Tier 2: frequency fallback across UserFlight ∪ UserManualFlight.
+    // Picks the userId with the most non-deleted rows across both tables.
+    // The UNION covers friend-share installs where the local DB may hold
+    // only manually-entered flights under a friend's userId.
+    const fallback = db
       .prepare(
-        "SELECT userId, COUNT(*) as cnt FROM UserFlight WHERE deleted IS NULL GROUP BY userId ORDER BY cnt DESC LIMIT 1"
+        `SELECT userId, COUNT(*) AS cnt FROM (
+           SELECT userId FROM UserFlight WHERE deleted IS NULL
+           UNION ALL
+           SELECT userId FROM UserManualFlight WHERE deleted IS NULL
+         ) GROUP BY userId ORDER BY cnt DESC LIMIT 1`
       )
       .get() as { userId: string; cnt: number } | undefined;
 
     if (!fallback) {
-      throw new Error("Could not determine Flighty user ID.");
+      throw new Error(
+        "Could not determine Flighty user ID. If this is a friend-share install " +
+          "or an install with multiple owners' flights, set the FLIGHTY_OWNER_USER_ID " +
+          "environment variable to the userId whose flights you want surfaced."
+      );
     }
 
     this.cachedOwnerId = fallback.userId;
     return fallback.userId;
+  }
+
+  /** True if the given userId has at least one non-deleted flight row across UserFlight ∪ UserManualFlight. */
+  private userHasAnyFlights(db: Database, userId: string): boolean {
+    const row = db
+      .prepare(
+        `SELECT 1 AS found FROM (
+           SELECT userId FROM UserFlight WHERE deleted IS NULL AND userId = ?
+           UNION ALL
+           SELECT userId FROM UserManualFlight WHERE deleted IS NULL AND userId = ?
+         ) LIMIT 1`
+      )
+      .get(userId, userId) as { found: number } | undefined;
+    return row !== undefined;
   }
 
   listFlights(params: ListFlightsParams = {}): FlightRecord[] {

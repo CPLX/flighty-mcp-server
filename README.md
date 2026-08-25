@@ -94,6 +94,24 @@ By default the server exposes 15 tools, including three that modify your Flighty
 
 Accepted truthy values: `1`, `true`, `yes` (case-insensitive). Anything else (or unset) leaves write tools enabled. `flighty_about` reports the current mode.
 
+## Friend-Share Installs
+
+If you use Flighty via someone else's account (shared through Flighty Friends), your locally signed-in Flighty account may own no flights itself — all the flights in the local database belong to the friend whose Flighty Pro account you're piggybacking on. In that setup, the server automatically falls back to picking the user with the most flights in the database. If your install has multiple people's flights and the server picks the wrong one, pin the correct user with an environment variable:
+
+```json
+{
+  "mcpServers": {
+    "flighty": {
+      "command": "node",
+      "args": ["/absolute/path/to/flighty-mcp-server/build/index.js"],
+      "env": { "FLIGHTY_OWNER_USER_ID": "the-userId-you-want" }
+    }
+  }
+}
+```
+
+You can find the right userId by querying `SELECT userId, COUNT(*) FROM UserFlight GROUP BY userId ORDER BY 2 DESC` against `~/Library/Containers/com.flightyapp.flighty/Data/Documents/MainFlightyDatabase.db`.
+
 ## Tools
 
 15 tools organized into four categories (12 read + 3 write; write tools are hidden when Read-Only Mode is on).

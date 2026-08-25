@@ -4,6 +4,22 @@ All notable changes to this project will be documented in this file.
 
 The format is loosely based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.9.0] — 2026-08-25
+
+### Added
+
+- **Friend-share install support.** New `FLIGHTY_OWNER_USER_ID` environment variable lets an operator pin the userId whose flights the server surfaces. Primary use case: installs where the locally signed-in Flighty account owns no flights and all data belongs to a Flighty Friend whose Pro account is being shared.
+- Owner-ID resolution is now three-tier: (1) `FLIGHTY_OWNER_USER_ID` env var, (2) JWT `sub` from `Flighty.sqlite` (but only if that userId actually has flights in the local DB), (3) frequency fallback across `UserFlight ∪ UserManualFlight`.
+
+### Fixed
+
+- **Friend-share installs no longer return empty results.** Previously, the JWT lookup returned the locally signed-in userId even when that user owned no flights in the local DB, causing every "your flights" query to filter to zero rows. The JWT tier now checks that the resolved userId has at least one flight; if not, it falls through to the frequency fallback, which picks up the friend whose flights actually populate the local DB.
+- **Frequency fallback now unions `UserFlight` and `UserManualFlight`.** A friend-share install whose only synced flights are manually-entered would previously fail owner-picking entirely. Manual flights arrived in 1.5.0 but the fallback wasn't updated at the time.
+
+### Credits
+
+- The friend-share install scenario was originally reported and diagnosed by @brijones in #4, which we've now closed as superseded by this PR.
+
 ## [1.8.0] — 2026-08-25
 
 ### Added
@@ -90,6 +106,7 @@ Filter `isMyFlight = 1` so friend-followed flights stop leaking into own-flight 
 
 Initial public release.
 
+[1.9.0]: https://github.com/CPLX/flighty-mcp-server/releases/tag/v1.9.0
 [1.8.0]: https://github.com/CPLX/flighty-mcp-server/releases/tag/v1.8.0
 [1.7.2]: https://github.com/CPLX/flighty-mcp-server/releases/tag/v1.7.2
 [1.7.1]: https://github.com/CPLX/flighty-mcp-server/releases/tag/v1.7.1
