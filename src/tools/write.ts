@@ -3,6 +3,39 @@ import { z } from "zod";
 import type { FlightyDatabase } from "../services/database.js";
 import { FlightyApi, parseFlightCode } from "../services/flighty-api.js";
 
+type Airline = { id: string; name: string; iata: string };
+
+async function findFlight(
+  db: FlightyDatabase,
+  api: FlightyApi,
+  airlineIata: string,
+  flightNumber: string,
+  date: string
+): Promise<{
+  candidates: Airline[];
+  match: { airline: Airline; serverUuid: string } | null;
+}> {
+  const candidates = db.lookupAirlines(airlineIata);
+  for (const airline of candidates) {
+    const serverUuid = await api.searchFlight(
+      airline.id,
+      flightNumber,
+      date
+    );
+    if (serverUuid) return { candidates, match: { airline, serverUuid } };
+  }
+  return { candidates, match: null };
+}
+
+function notFoundMessage(
+  flightCode: string,
+  date: string,
+  candidates: Airline[]
+): string {
+  const airlineNames = candidates.map((candidate) => candidate.name).join(", ");
+  return `No flight found for ${flightCode} on ${date} (tried ${airlineNames}). Check the flight number and date.`;
+}
+
 export function registerWriteTools(
   server: McpServer,
   db: FlightyDatabase,
@@ -44,27 +77,31 @@ Returns the server-side flight UUID on success.`,
           params.flight_code
         );
 
-        const airline = db.lookupAirline(airlineIata);
-
-        const serverUuid = await api.searchFlight(
-          airline.id,
+        const { candidates, match } = await findFlight(
+          db,
+          api,
+          airlineIata,
           flightNumber,
           params.date
         );
 
-        if (!serverUuid) {
+        if (!match) {
           return {
             content: [
               {
                 type: "text",
-                text: `No flight found for ${params.flight_code} on ${params.date}. Check the flight number and date.`,
+                text: notFoundMessage(
+                  params.flight_code,
+                  params.date,
+                  candidates
+                ),
               },
             ],
             isError: true,
           };
         }
 
-        await api.subscribeFlight(serverUuid);
+        await api.subscribeFlight(match.serverUuid);
 
         return {
           content: [
@@ -75,8 +112,8 @@ Returns the server-side flight UUID on success.`,
                   status: "added",
                   flight_code: params.flight_code,
                   date: params.date,
-                  airline: airline.name,
-                  server_flight_uuid: serverUuid,
+                  airline: match.airline.name,
+                  server_flight_uuid: match.serverUuid,
                   message:
                     "Flight added to your Flighty account. It will appear on all your devices within seconds.",
                 },
@@ -136,27 +173,31 @@ Returns the server-side flight UUID on success.`,
           params.flight_code
         );
 
-        const airline = db.lookupAirline(airlineIata);
-
-        const serverUuid = await api.searchFlight(
-          airline.id,
+        const { candidates, match } = await findFlight(
+          db,
+          api,
+          airlineIata,
           flightNumber,
           params.date
         );
 
-        if (!serverUuid) {
+        if (!match) {
           return {
             content: [
               {
                 type: "text",
-                text: `No flight found for ${params.flight_code} on ${params.date}. Check the flight number and date.`,
+                text: notFoundMessage(
+                  params.flight_code,
+                  params.date,
+                  candidates
+                ),
               },
             ],
             isError: true,
           };
         }
 
-        await api.followFlight(serverUuid);
+        await api.followFlight(match.serverUuid);
 
         return {
           content: [
@@ -167,8 +208,8 @@ Returns the server-side flight UUID on success.`,
                   status: "followed",
                   flight_code: params.flight_code,
                   date: params.date,
-                  airline: airline.name,
-                  server_flight_uuid: serverUuid,
+                  airline: match.airline.name,
+                  server_flight_uuid: match.serverUuid,
                   message:
                     "Flight added to your Flighty tracking list. It will appear on all your devices within seconds.",
                 },

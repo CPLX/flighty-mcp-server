@@ -7,6 +7,7 @@ import {
   KM_TO_MILES,
   EARTH_CIRCUMFERENCE_KM,
 } from "../constants.js";
+import { readFlightyAuthToken, readJwtSubject } from "./auth-token.js";
 import type {
   FlightRecord,
   AirportRecord,
@@ -157,10 +158,15 @@ WHERE uf.deleted IS NULL AND f.deleted IS NULL AND uf.isMyFlight = 1
 
 export class FlightyDatabase {
   private dbPath: string;
+  private authDbPath: string;
   private cachedOwnerId: string | null = null;
 
-  constructor(dbPath: string = MAIN_DB_PATH) {
+  constructor(
+    dbPath: string = MAIN_DB_PATH,
+    authDbPath: string = AUTH_DB_PATH
+  ) {
     this.dbPath = dbPath;
+    this.authDbPath = authDbPath;
   }
 
   private getDb(): Database {
@@ -186,32 +192,17 @@ export class FlightyDatabase {
       return envOwner;
     }
 
-    // Tier 1: JWT `sub` claim from Flighty.sqlite. Authoritative for standard
+    // Tier 1: JWT `sub` claim from Flighty's auth token. Authoritative for standard
     // single-account installs. But on friend-share installs the locally
     // signed-in account may own zero flights and the JWT userId won't match
     // any UserFlight/UserManualFlight rows — in that case, fall through to
     // Tier 2 rather than returning a userId that filters every query to zero.
-    try {
-      const authDb = new Database(AUTH_DB_PATH, { readOnly: true });
-      try {
-        const row = authDb
-          .prepare("SELECT ZTOKEN FROM ZUSER LIMIT 1")
-          .get() as { ZTOKEN: string } | undefined;
-        if (row?.ZTOKEN) {
-          const payload = row.ZTOKEN.split(".")[1];
-          const decoded = JSON.parse(
-            Buffer.from(payload, "base64url").toString("utf-8")
-          );
-          if (decoded.sub && this.userHasAnyFlights(db, decoded.sub)) {
-            this.cachedOwnerId = decoded.sub;
-            return decoded.sub;
-          }
-        }
-      } finally {
-        authDb.close();
-      }
-    } catch {
-      // Fall through to frequency-based fallback
+    const jwtSubject = readJwtSubject(
+      readFlightyAuthToken(this.dbPath, this.authDbPath) ?? ""
+    );
+    if (jwtSubject && this.userHasAnyFlights(db, jwtSubject)) {
+      this.cachedOwnerId = jwtSubject;
+      return jwtSubject;
     }
 
     // Tier 2: frequency fallback across UserFlight ∪ UserManualFlight.
@@ -751,22 +742,38 @@ export class FlightyDatabase {
     }
   }
 
-  lookupAirline(iata: string): { id: string; name: string; iata: string } {
+  // IATA codes are not unique. Return every match, with airlines that appear
+  // most often in the local flight database first.
+  lookupAirlines(
+    iata: string
+  ): Array<{ id: string; name: string; iata: string }> {
     const db = this.getDb();
     try {
-      const row = db
+      const rows = db
         .prepare(
-          "SELECT id, name, iata FROM Airline WHERE UPPER(iata) = ? AND deleted IS NULL LIMIT 1"
+          `SELECT a.id, a.name, a.iata,
+                  (SELECT COUNT(*) FROM (
+                     SELECT f.id FROM Flight f
+                     WHERE f.airlineId = a.id AND f.deleted IS NULL
+                     UNION ALL
+                     SELECT mf.id FROM ManualFlight mf
+                     WHERE mf.airlineId = a.id AND mf.deleted IS NULL
+                   )) AS flightCount
+           FROM Airline a
+           WHERE UPPER(a.iata) = ? AND a.deleted IS NULL
+           ORDER BY flightCount DESC, a.name`
         )
-        .get(iata.toUpperCase()) as
-        | { id: string; name: string; iata: string }
-        | undefined;
-      if (!row) {
+        .all(iata.toUpperCase()) as Array<{
+        id: string;
+        name: string;
+        iata: string;
+      }>;
+      if (rows.length === 0) {
         throw new Error(
           `Airline with IATA code '${iata}' not found in Flighty database.`
         );
       }
-      return row;
+      return rows.map(({ id, name, iata }) => ({ id, name, iata }));
     } finally {
       db.close();
     }

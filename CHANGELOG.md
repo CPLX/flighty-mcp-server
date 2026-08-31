@@ -4,6 +4,20 @@ All notable changes to this project will be documented in this file.
 
 The format is loosely based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.10.0] - 2026-08-29
+
+### Changed
+
+- Add and follow operations now try every local airline record matching the supplied IATA code, prioritizing airlines already present in the local flight database. This handles non-unique IATA codes without silently searching the wrong operator.
+
+### Fixed
+
+- **Current Flighty credentials are discovered reliably.** Write tools failed with "Is the Flighty app installed and logged in?" even on a freshly signed-in install. Flighty migrated both credentials out of their old homes (see the `migratedUserToStatic` / `migratedProfileToStatic` UserDefaults keys), leaving the legacy locations present but empty, which made the failure look like a login problem:
+  - The auth token moved from `Flighty.sqlite` → `ZUSER.ZTOKEN` (Core Data store, now created but with zero rows) to `MainFlightyDatabase.db` → `Account.authToken`.
+  - The sync token URL moved from the `syncInfoV2` UserDefaults key (now absent entirely) to `MainFlightyDatabase.db` → `SyncInfo.nextURL`.
+
+  Both reads now try the main database first and fall back to the legacy location, so old and new installs work. Owner-ID resolution uses the same migrated auth-token lookup instead of dropping immediately to its frequency heuristic. The auth-token error message now names both paths it tried instead of blaming the user's login.
+
 ## [1.9.0] — 2026-08-25
 
 ### Added
@@ -106,6 +120,7 @@ Filter `isMyFlight = 1` so friend-followed flights stop leaking into own-flight 
 
 Initial public release.
 
+[1.10.0]: https://github.com/CPLX/flighty-mcp-server/releases/tag/v1.10.0
 [1.9.0]: https://github.com/CPLX/flighty-mcp-server/releases/tag/v1.9.0
 [1.8.0]: https://github.com/CPLX/flighty-mcp-server/releases/tag/v1.8.0
 [1.7.2]: https://github.com/CPLX/flighty-mcp-server/releases/tag/v1.7.2

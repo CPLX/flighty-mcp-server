@@ -73,11 +73,11 @@ describe("parseFlightCode", () => {
 describe("flighty_follow_flight", () => {
   it("follows a flight successfully", async () => {
     const mockDb = {
-      lookupAirline: () => ({
+      lookupAirlines: () => [{
         id: "airline-uuid",
         name: "United Airlines",
         iata: "UA",
-      }),
+      }],
     };
     const followFlight = mock.fn(async () => {});
     const mockApi = {
@@ -101,11 +101,11 @@ describe("flighty_follow_flight", () => {
 
   it("returns error when flight not found", async () => {
     const mockDb = {
-      lookupAirline: () => ({
+      lookupAirlines: () => [{
         id: "airline-uuid",
         name: "United Airlines",
         iata: "UA",
-      }),
+      }],
     };
     const followFlight = mock.fn(async () => {});
     const mockApi = {
@@ -123,7 +123,7 @@ describe("flighty_follow_flight", () => {
   });
 
   it("returns error on invalid flight code", async () => {
-    const mockDb = { lookupAirline: mock.fn() };
+    const mockDb = { lookupAirlines: mock.fn() };
     const mockApi = { searchFlight: mock.fn(), followFlight: mock.fn() };
 
     const tools = captureTools(mockDb, mockApi);
@@ -136,11 +136,11 @@ describe("flighty_follow_flight", () => {
 
   it("returns error when API throws", async () => {
     const mockDb = {
-      lookupAirline: () => ({
+      lookupAirlines: () => [{
         id: "airline-uuid",
         name: "United Airlines",
         iata: "UA",
-      }),
+      }],
     };
     const mockApi = {
       searchFlight: async () => "flight-uuid",
@@ -156,16 +156,42 @@ describe("flighty_follow_flight", () => {
     assert.equal(result.isError, true);
     assert.ok(result.content[0].text.includes("Network error"));
   });
+
+  it("tries each airline that shares an IATA code", async () => {
+    const mockDb = {
+      lookupAirlines: () => [
+        { id: "first-airline", name: "First Airline", iata: "ZZ" },
+        { id: "second-airline", name: "Second Airline", iata: "ZZ" },
+      ],
+    };
+    const searchFlight = mock.fn(async (airlineId: string) =>
+      airlineId === "second-airline" ? "flight-server-uuid" : null
+    );
+    const followFlight = mock.fn(async () => {});
+
+    const tools = captureTools(mockDb, { searchFlight, followFlight });
+    const result = await tools.get("flighty_follow_flight")!({
+      flight_code: "ZZ42",
+      date: "2026-06-15",
+    });
+
+    assert.equal(result.isError, undefined);
+    assert.equal(searchFlight.mock.calls.length, 2);
+    assert.equal(searchFlight.mock.calls[0].arguments[0], "first-airline");
+    assert.equal(searchFlight.mock.calls[1].arguments[0], "second-airline");
+    assert.equal(followFlight.mock.calls.length, 1);
+    assert.equal(JSON.parse(result.content[0].text).airline, "Second Airline");
+  });
 });
 
 describe("flighty_add_flight", () => {
   it("adds a flight successfully", async () => {
     const mockDb = {
-      lookupAirline: () => ({
+      lookupAirlines: () => [{
         id: "airline-uuid",
         name: "Delta Air Lines",
         iata: "DL",
-      }),
+      }],
     };
     const subscribeFlight = mock.fn(async () => {});
     const mockApi = {
@@ -191,11 +217,11 @@ describe("flighty_add_flight", () => {
 
   it("returns error when flight not found", async () => {
     const mockDb = {
-      lookupAirline: () => ({
+      lookupAirlines: () => [{
         id: "airline-uuid",
         name: "Delta Air Lines",
         iata: "DL",
-      }),
+      }],
     };
     const subscribeFlight = mock.fn(async () => {});
     const mockApi = {
@@ -210,5 +236,31 @@ describe("flighty_add_flight", () => {
     assert.equal(result.isError, true);
     assert.ok(result.content[0].text.includes("No flight found"));
     assert.equal(subscribeFlight.mock.calls.length, 0);
+  });
+
+  it("tries each airline that shares an IATA code", async () => {
+    const mockDb = {
+      lookupAirlines: () => [
+        { id: "first-airline", name: "First Airline", iata: "ZZ" },
+        { id: "second-airline", name: "Second Airline", iata: "ZZ" },
+      ],
+    };
+    const searchFlight = mock.fn(async (airlineId: string) =>
+      airlineId === "second-airline" ? "flight-uuid-123" : null
+    );
+    const subscribeFlight = mock.fn(async () => {});
+
+    const tools = captureTools(mockDb, { searchFlight, subscribeFlight });
+    const result = await tools.get("flighty_add_flight")!({
+      flight_code: "ZZ42",
+      date: "2026-07-01",
+    });
+
+    assert.equal(result.isError, undefined);
+    assert.equal(searchFlight.mock.calls.length, 2);
+    assert.equal(searchFlight.mock.calls[0].arguments[0], "first-airline");
+    assert.equal(searchFlight.mock.calls[1].arguments[0], "second-airline");
+    assert.equal(subscribeFlight.mock.calls.length, 1);
+    assert.equal(JSON.parse(result.content[0].text).airline, "Second Airline");
   });
 });

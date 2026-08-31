@@ -1,12 +1,12 @@
-import { DatabaseSync as Database } from "node:sqlite";
-import { execSync } from "child_process";
 import {
   AUTH_DB_PATH,
-  PREFS_PLIST_PATH,
+  MAIN_DB_PATH,
   FLIGHTY_API_BASE,
   FLIGHTY_USER_AGENT,
   FLIGHTY_BUILD_TOKEN,
 } from "../constants.js";
+import { readFlightyAuthToken } from "./auth-token.js";
+import { readFlightySyncUrl } from "./sync-token.js";
 
 // --- Protobuf encoding helpers ---
 // These construct tiny, well-understood protobuf messages without a library dependency.
@@ -47,21 +47,22 @@ export class FlightyApi {
   private getJwt(): string {
     if (this.jwt) return this.jwt;
 
-    const db = new Database(AUTH_DB_PATH, { readOnly: true });
-    try {
-      const row = db
-        .prepare("SELECT ZTOKEN FROM ZUSER LIMIT 1")
-        .get() as { ZTOKEN: string } | undefined;
-      if (!row?.ZTOKEN) {
-        throw new Error(
-          "Could not read Flighty auth token from Flighty.sqlite. Is the Flighty app installed and logged in?"
-        );
-      }
-      this.jwt = row.ZTOKEN;
-      return this.jwt;
-    } finally {
-      db.close();
+    // Flighty moved the auth token out of the legacy Core Data store
+    // (Flighty.sqlite -> ZUSER.ZTOKEN) and into the main database
+    // (MainFlightyDatabase.db -> Account.authToken). On current builds the
+    // Core Data store is created but left empty, so read the main DB first
+    // and only fall back to the legacy location for older installs.
+    const token = readFlightyAuthToken();
+
+    if (!token) {
+      throw new Error(
+        `Could not read Flighty auth token from ${MAIN_DB_PATH} (Account.authToken) or ${AUTH_DB_PATH} (ZUSER.ZTOKEN). ` +
+          "Is the Flighty app installed and logged in? If you just signed in, give the app a moment to persist the session."
+      );
     }
+
+    this.jwt = token;
+    return this.jwt;
   }
 
   private getHeaders(): Record<string, string> {
@@ -199,23 +200,15 @@ export class FlightyApi {
   }
 
   /**
-   * Read the sync token URL from Flighty's UserDefaults plist.
+   * Read the sync token URL.
+   *
+   * Current Flighty builds store this in MainFlightyDatabase.db (SyncInfo.nextURL);
+   * the `syncInfoV2` UserDefaults key it used to live in is absent on those installs
+   * (the same migration that moved the auth token out of the Core Data store — see
+   * the `migrated*ToStatic` prefs). Read the database first, fall back to the plist.
    */
   private readSyncTokenUrl(): string | null {
-    try {
-      const raw = execSync(
-        `plutil -extract syncInfoV2 raw "${PREFS_PLIST_PATH}"`,
-        { encoding: "utf-8" }
-      ).trim();
-
-      const decoded = Buffer.from(raw, "base64").toString("utf-8");
-      const obj = JSON.parse(decoded) as {
-        full?: { nextURL?: string };
-      };
-      return obj.full?.nextURL ?? null;
-    } catch {
-      return null;
-    }
+    return readFlightySyncUrl();
   }
 
   /**
